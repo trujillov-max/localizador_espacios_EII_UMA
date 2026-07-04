@@ -1,9 +1,8 @@
-# Localizador de Espacios EII-UMA
+# Localizador EII-UMA — versión móvil con scroll nativo
 
-Versión móvil-first para GitHub Pages.
+Esta versión permite mover el plano en iPhone con el scroll táctil normal dentro del mapa.
 
-## Actualización
+## Actualización en GitHub
 
-Sustituye el `index.html` actual de tu repositorio por este nuevo `index.html`.
-Mantén `.nojekyll`.
+Sustituye el archivo `index.html` del repositorio por este `index.html`.
 
