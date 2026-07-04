@@ -292,9 +292,9 @@
       background:
         radial-gradient(circle at 20% 10%, rgba(0,166,195,0.08), transparent 28%),
         linear-gradient(180deg, #F8FCFD 0%, #EEF6F8 100%);
-      touch-action: pan-x pan-y;
+      touch-action: pan-x pan-y pinch-zoom;
       position: relative;
-      scrollbar-gutter: stable;
+      scrollbar-gutter: stable both-edges;
     }
 
     .map-inner {
@@ -336,7 +336,7 @@
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
-      touch-action: pan-x pan-y;
+      touch-action: pan-x pan-y pinch-zoom;
       pointer-events: auto;
     }
 
@@ -717,7 +717,7 @@
     let currentPlant = ALL_PLANTS;
     let currentViewId = views[0]?.view_id || "";
     let selectedId = "";
-    let zoom = window.matchMedia("(max-width: 899px)").matches ? 0.82 : 1;
+    let zoom = window.matchMedia("(max-width: 899px)").matches ? 1 : 1;
 
     const search = document.getElementById("search");
     const plantFilter = document.getElementById("plantFilter");
@@ -1046,13 +1046,26 @@
       });
     }
 
-    function getBaseMapWidth() {
-      return isMobile() ? 980 : Math.max(1150, mapWrap.clientWidth);
+    function getBaseMapWidth(view) {
+      if (!isMobile()) {
+        return Math.max(1150, mapWrap.clientWidth);
+      }
+
+      const ratio = view ? (view.img_design.heightIn / view.img_design.widthIn) : 0.52;
+
+      // En móvil el plano necesita ser mayor que la ventana tanto en horizontal
+      // como en vertical para que Safari permita moverlo en ambas direcciones.
+      const widthForHorizontalScroll = mapWrap.clientWidth * 1.85;
+      const widthForVerticalScroll = ratio > 0
+        ? (mapWrap.clientHeight * 1.45) / ratio
+        : 980;
+
+      return Math.max(980, widthForHorizontalScroll, widthForVerticalScroll);
     }
 
     function applyZoom() {
       const view = getCurrentView();
-      const baseWidth = getBaseMapWidth();
+      const baseWidth = getBaseMapWidth(view);
       const ratio = view ? (view.img_design.heightIn / view.img_design.widthIn) : 0.52;
       const widthPx = Math.round(baseWidth * zoom);
       const heightPx = Math.round(baseWidth * ratio * zoom);
@@ -1081,7 +1094,7 @@
     }
 
     function zoomAll() {
-      zoom = isMobile() ? 0.82 : 1;
+      zoom = isMobile() ? 1 : 1;
       applyZoom();
       setTimeout(centerSelectedLabel, 80);
     }
