@@ -562,6 +562,56 @@
         display: none;
       }
     }
+
+    .floating-center {
+      display: none;
+      position: absolute;
+      right: 14px;
+      bottom: calc(14px + var(--safe-bottom));
+      z-index: 35;
+      min-height: 42px;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: linear-gradient(135deg, var(--eii-cyan), var(--eii-cyan-dark));
+      color: white;
+      font-size: 14px;
+      font-weight: 900;
+      box-shadow: 0 10px 26px rgba(31, 46, 72, 0.24);
+    }
+
+    .floating-center:active {
+      transform: translateY(1px);
+      box-shadow: 0 6px 18px rgba(31, 46, 72, 0.22);
+    }
+
+    @media (max-width: 899px) {
+      .zoom-controls {
+        display: none;
+      }
+
+      .selected-bar {
+        grid-template-columns: 1fr;
+      }
+
+      .floating-center {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      #centerSelectedBtn {
+        display: none;
+      }
+    }
+
+    @media (min-width: 900px) {
+      .floating-center {
+        display: none !important;
+      }
+    }
+
   </style>
 </head>
 <body class="native-map-scroll">
@@ -623,6 +673,7 @@
             <img id="mapImage" alt="" draggable="false">
             <div id="labelLayer" class="label-layer"></div>
           </div>
+          <button id="floatingCenterBtn" class="floating-center" aria-label="Centrar espacio seleccionado">◎ Centrar espacio</button>
         </section>
       </main>
     </div>
@@ -1085,6 +1136,7 @@
     document.getElementById("closeSheet").onclick = closeResults;
     sheetBackdrop.onclick = closeResults;
     document.getElementById("centerSelectedBtn").onclick = centerSelectedLabel;
+    document.getElementById("floatingCenterBtn").onclick = centerSelectedLabel;
 
     document.getElementById("zoomIn").onclick = () => setZoom(zoom * 1.22);
     document.getElementById("zoomOut").onclick = () => setZoom(zoom / 1.22);

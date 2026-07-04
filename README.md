@@ -1,8 +1,12 @@
-# Localizador EII-UMA — versión móvil con scroll nativo
+# Localizador EII-UMA — versión móvil sin controles de zoom
 
-Esta versión permite mover el plano en iPhone con el scroll táctil normal dentro del mapa.
+Versión optimizada para móvil:
+- scroll táctil normal dentro del mapa;
+- sin botones de zoom en móvil;
+- botón flotante para centrar el espacio seleccionado;
+- en escritorio se mantienen los controles de zoom.
 
 ## Actualización en GitHub
 
-Sustituye el archivo `index.html` del repositorio por este `index.html`.
+Sustituye el archivo `index.html` del repositorio por este nuevo `index.html`.
 
