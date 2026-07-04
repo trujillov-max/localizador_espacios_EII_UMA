@@ -559,7 +559,7 @@
       }
 
       #centerSelectedBtn {
-        display: none;
+        display: inline-flex;
       }
     }
 
@@ -594,21 +594,49 @@
         grid-template-columns: 1fr;
       }
 
-      .floating-center {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-      }
-
       #centerSelectedBtn {
-        display: none;
+        display: inline-flex;
       }
     }
 
     @media (min-width: 900px) {
       .floating-center {
         display: none !important;
+      }
+    }
+
+
+    .center-icon-button {
+      min-width: 42px;
+      width: 42px;
+      padding-left: 0;
+      padding-right: 0;
+      font-size: 20px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 899px) {
+      .summary-row {
+        grid-template-columns: 1fr auto auto;
+      }
+
+      #centerSelectedBtn {
+        display: inline-flex !important;
+      }
+
+      .zoom-controls {
+        display: none;
+      }
+
+      .selected-bar {
+        grid-template-columns: 1fr;
+      }
+
+      .map-wrap {
+        touch-action: pan-x pan-y pinch-zoom;
       }
     }
 
@@ -640,7 +668,7 @@
       <div class="summary-row">
         <div class="counter" id="counter"></div>
         <button class="pill-button primary" id="showResults">Resultados</button>
-        <button class="pill-button" id="centerSelectedBtn">Centrar</button>
+        <button class="pill-button center-icon-button" id="centerSelectedBtn" title="Centrar espacio" aria-label="Centrar espacio seleccionado">◎</button>
       </div>
     </section>
 
@@ -673,7 +701,6 @@
             <img id="mapImage" alt="" draggable="false">
             <div id="labelLayer" class="label-layer"></div>
           </div>
-          <button id="floatingCenterBtn" class="floating-center" aria-label="Centrar espacio seleccionado">◎ Centrar espacio</button>
         </section>
       </main>
     </div>
@@ -1043,7 +1070,7 @@
       const centerX = mapWrap.scrollLeft + mapWrap.clientWidth / 2;
       const centerY = mapWrap.scrollTop + mapWrap.clientHeight / 2;
 
-      zoom = Math.min(3, Math.max(0.55, nextZoom));
+      zoom = typeof clampZoomValue === 'function' ? clampZoomValue(nextZoom) : Math.min(3, Math.max(0.55, nextZoom));
       if (Math.abs(zoom - previousZoom) < 0.001) return;
 
       applyZoom();
@@ -1136,7 +1163,6 @@
     document.getElementById("closeSheet").onclick = closeResults;
     sheetBackdrop.onclick = closeResults;
     document.getElementById("centerSelectedBtn").onclick = centerSelectedLabel;
-    document.getElementById("floatingCenterBtn").onclick = centerSelectedLabel;
 
     document.getElementById("zoomIn").onclick = () => setZoom(zoom * 1.22);
     document.getElementById("zoomOut").onclick = () => setZoom(zoom / 1.22);
@@ -1153,6 +1179,75 @@
         mapWrap.scrollTop = Math.max(0, ratioY * mapWrap.scrollHeight - mapWrap.clientHeight / 2);
       });
     });
+
+
+    let pinchActive = false;
+    let pinchStartDistance = 0;
+    let pinchStartZoom = 1;
+    let pinchStartContentX = 0;
+    let pinchStartContentY = 0;
+
+    function clampZoomValue(value) {
+      return Math.min(3, Math.max(0.55, value));
+    }
+
+    function touchDistance(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.hypot(dx, dy);
+    }
+
+    function touchCenter(touches) {
+      return {
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2
+      };
+    }
+
+    mapWrap.addEventListener("touchstart", event => {
+      if (event.touches.length !== 2) return;
+
+      const rect = mapWrap.getBoundingClientRect();
+      const center = touchCenter(event.touches);
+
+      pinchActive = true;
+      pinchStartDistance = touchDistance(event.touches);
+      pinchStartZoom = zoom;
+      pinchStartContentX = mapWrap.scrollLeft + (center.x - rect.left);
+      pinchStartContentY = mapWrap.scrollTop + (center.y - rect.top);
+    }, { passive: true });
+
+    mapWrap.addEventListener("touchmove", event => {
+      if (!pinchActive || event.touches.length !== 2) return;
+
+      event.preventDefault();
+
+      const rect = mapWrap.getBoundingClientRect();
+      const center = touchCenter(event.touches);
+      const distance = touchDistance(event.touches);
+      const factor = distance / pinchStartDistance;
+
+      const previousZoom = zoom;
+      zoom = clampZoomValue(pinchStartZoom * factor);
+
+      if (Math.abs(previousZoom - zoom) < 0.001) return;
+
+      applyZoom();
+
+      const ratio = zoom / pinchStartZoom;
+
+      mapWrap.scrollLeft = pinchStartContentX * ratio - (center.x - rect.left);
+      mapWrap.scrollTop = pinchStartContentY * ratio - (center.y - rect.top);
+    }, { passive: false });
+
+    mapWrap.addEventListener("touchend", event => {
+      if (event.touches.length < 2) pinchActive = false;
+    }, { passive: true });
+
+    mapWrap.addEventListener("touchcancel", () => {
+      pinchActive = false;
+    }, { passive: true });
+
 
     render();
   </script>
