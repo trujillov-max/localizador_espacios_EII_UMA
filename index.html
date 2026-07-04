@@ -292,9 +292,9 @@
       background:
         radial-gradient(circle at 20% 10%, rgba(0,166,195,0.08), transparent 28%),
         linear-gradient(180deg, #F8FCFD 0%, #EEF6F8 100%);
-      touch-action: pan-x pan-y pinch-zoom;
+      touch-action: pan-x pan-y;
       position: relative;
-      scrollbar-gutter: stable both-edges;
+      scrollbar-gutter: stable;
     }
 
     .map-inner {
@@ -336,7 +336,7 @@
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
-      touch-action: pan-x pan-y pinch-zoom;
+      touch-action: pan-x pan-y;
       pointer-events: auto;
     }
 
@@ -640,6 +640,13 @@
       }
     }
 
+
+    @media (max-width: 899px) {
+      .map-wrap.zoomed-map {
+        touch-action: none;
+      }
+    }
+
   </style>
 </head>
 <body class="native-map-scroll">
@@ -717,7 +724,7 @@
     let currentPlant = ALL_PLANTS;
     let currentViewId = views[0]?.view_id || "";
     let selectedId = "";
-    let zoom = window.matchMedia("(max-width: 899px)").matches ? 1 : 1;
+    let zoom = window.matchMedia("(max-width: 899px)").matches ? 0.82 : 1;
 
     const search = document.getElementById("search");
     const plantFilter = document.getElementById("plantFilter");
@@ -1024,7 +1031,7 @@
         }, { passive: true });
 
         el.onclick = event => {
-          if (touchMoved) {
+          if (touchMoved || panHasMoved) {
             event.preventDefault();
             event.stopPropagation();
             return;
@@ -1046,33 +1053,34 @@
       });
     }
 
-    function getBaseMapWidth(view) {
-      if (!isMobile()) {
-        return Math.max(1150, mapWrap.clientWidth);
-      }
-
-      const ratio = view ? (view.img_design.heightIn / view.img_design.widthIn) : 0.52;
-
-      // En móvil el plano necesita ser mayor que la ventana tanto en horizontal
-      // como en vertical para que Safari permita moverlo en ambas direcciones.
-      const widthForHorizontalScroll = mapWrap.clientWidth * 1.85;
-      const widthForVerticalScroll = ratio > 0
-        ? (mapWrap.clientHeight * 1.45) / ratio
-        : 980;
-
-      return Math.max(980, widthForHorizontalScroll, widthForVerticalScroll);
+    function getBaseMapWidth() {
+      return isMobile() ? 980 : Math.max(1150, mapWrap.clientWidth);
     }
 
     function applyZoom() {
       const view = getCurrentView();
-      const baseWidth = getBaseMapWidth(view);
+      const baseWidth = getBaseMapWidth();
       const ratio = view ? (view.img_design.heightIn / view.img_design.widthIn) : 0.52;
-      const widthPx = Math.round(baseWidth * zoom);
-      const heightPx = Math.round(baseWidth * ratio * zoom);
+
+      let widthPx = Math.round(baseWidth * zoom);
+      let heightPx = Math.round(baseWidth * ratio * zoom);
+
+      // En móvil, solo tras ampliar, aseguramos que haya altura suficiente
+      // para poder subir y bajar por el plano con un dedo.
+      if (isMobile() && zoom > 0.95 && heightPx < mapWrap.clientHeight + 180 && ratio > 0) {
+        heightPx = Math.round(mapWrap.clientHeight + 180);
+        widthPx = Math.round(heightPx / ratio);
+      }
 
       mapInner.style.width = `${widthPx}px`;
       mapInner.style.minWidth = `${widthPx}px`;
       mapInner.style.height = `${heightPx}px`;
+
+      if (isMobile() && zoom > 0.95) {
+        mapWrap.classList.add("zoomed-map");
+      } else {
+        mapWrap.classList.remove("zoomed-map");
+      }
 
       zoomValue.textContent = `${Math.round(zoom * 100)}%`;
       requestAnimationFrame(resizeLabels);
@@ -1094,7 +1102,8 @@
     }
 
     function zoomAll() {
-      zoom = isMobile() ? 1 : 1;
+      zoom = isMobile() ? 0.82 : 1;
+      userHasPinchZoomed = false;
       applyZoom();
       setTimeout(centerSelectedLabel, 80);
     }
@@ -1195,10 +1204,19 @@
 
 
     let pinchActive = false;
+    let oneFingerPanActive = false;
+    let userHasPinchZoomed = false;
+
     let pinchStartDistance = 0;
     let pinchStartZoom = 1;
     let pinchStartContentX = 0;
     let pinchStartContentY = 0;
+
+    let panStartX = 0;
+    let panStartY = 0;
+    let panStartScrollLeft = 0;
+    let panStartScrollTop = 0;
+    let panHasMoved = false;
 
     function clampZoomValue(value) {
       return Math.min(3, Math.max(0.55, value));
@@ -1217,48 +1235,110 @@
       };
     }
 
+    function startOneFingerPan(touch) {
+      if (!isMobile() || !userHasPinchZoomed) return;
+
+      oneFingerPanActive = true;
+      panHasMoved = false;
+      panStartX = touch.clientX;
+      panStartY = touch.clientY;
+      panStartScrollLeft = mapWrap.scrollLeft;
+      panStartScrollTop = mapWrap.scrollTop;
+    }
+
     mapWrap.addEventListener("touchstart", event => {
-      if (event.touches.length !== 2) return;
+      if (!isMobile()) return;
 
-      const rect = mapWrap.getBoundingClientRect();
-      const center = touchCenter(event.touches);
+      if (event.touches.length === 2) {
+        const rect = mapWrap.getBoundingClientRect();
+        const center = touchCenter(event.touches);
 
-      pinchActive = true;
-      pinchStartDistance = touchDistance(event.touches);
-      pinchStartZoom = zoom;
-      pinchStartContentX = mapWrap.scrollLeft + (center.x - rect.left);
-      pinchStartContentY = mapWrap.scrollTop + (center.y - rect.top);
+        pinchActive = true;
+        oneFingerPanActive = false;
+        pinchStartDistance = touchDistance(event.touches);
+        pinchStartZoom = zoom;
+        pinchStartContentX = mapWrap.scrollLeft + (center.x - rect.left);
+        pinchStartContentY = mapWrap.scrollTop + (center.y - rect.top);
+        return;
+      }
+
+      if (event.touches.length === 1) {
+        startOneFingerPan(event.touches[0]);
+      }
     }, { passive: true });
 
     mapWrap.addEventListener("touchmove", event => {
-      if (!pinchActive || event.touches.length !== 2) return;
+      if (!isMobile()) return;
 
-      event.preventDefault();
+      // Pinza con dos dedos: hace zoom sobre el plano.
+      if (pinchActive && event.touches.length === 2) {
+        event.preventDefault();
 
-      const rect = mapWrap.getBoundingClientRect();
-      const center = touchCenter(event.touches);
-      const distance = touchDistance(event.touches);
-      const factor = distance / pinchStartDistance;
+        const rect = mapWrap.getBoundingClientRect();
+        const center = touchCenter(event.touches);
+        const distance = touchDistance(event.touches);
+        const factor = distance / pinchStartDistance;
 
-      const previousZoom = zoom;
-      zoom = clampZoomValue(pinchStartZoom * factor);
+        const previousZoom = zoom;
+        zoom = clampZoomValue(pinchStartZoom * factor);
 
-      if (Math.abs(previousZoom - zoom) < 0.001) return;
+        if (Math.abs(previousZoom - zoom) < 0.001) return;
 
-      applyZoom();
+        userHasPinchZoomed = zoom > 0.95;
+        applyZoom();
 
-      const ratio = zoom / pinchStartZoom;
+        const ratio = zoom / pinchStartZoom;
 
-      mapWrap.scrollLeft = pinchStartContentX * ratio - (center.x - rect.left);
-      mapWrap.scrollTop = pinchStartContentY * ratio - (center.y - rect.top);
+        mapWrap.scrollLeft = pinchStartContentX * ratio - (center.x - rect.left);
+        mapWrap.scrollTop = pinchStartContentY * ratio - (center.y - rect.top);
+        return;
+      }
+
+      // Después de haber hecho zoom, un dedo arrastra el plano en X e Y.
+      if (oneFingerPanActive && event.touches.length === 1) {
+        event.preventDefault();
+
+        const touch = event.touches[0];
+        const dx = touch.clientX - panStartX;
+        const dy = touch.clientY - panStartY;
+
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+          panHasMoved = true;
+        }
+
+        mapWrap.scrollLeft = panStartScrollLeft - dx;
+        mapWrap.scrollTop = panStartScrollTop - dy;
+      }
     }, { passive: false });
 
     mapWrap.addEventListener("touchend", event => {
-      if (event.touches.length < 2) pinchActive = false;
+      if (!isMobile()) return;
+
+      if (event.touches.length < 2) {
+        pinchActive = false;
+      }
+
+      // Si se levantó un dedo de la pinza y queda otro, permitimos continuar moviendo.
+      if (event.touches.length === 1 && userHasPinchZoomed) {
+        startOneFingerPan(event.touches[0]);
+        return;
+      }
+
+      if (event.touches.length === 0) {
+        oneFingerPanActive = false;
+
+        if (panHasMoved) {
+          setTimeout(() => {
+            panHasMoved = false;
+          }, 80);
+        }
+      }
     }, { passive: true });
 
     mapWrap.addEventListener("touchcancel", () => {
       pinchActive = false;
+      oneFingerPanActive = false;
+      panHasMoved = false;
     }, { passive: true });
 
 
